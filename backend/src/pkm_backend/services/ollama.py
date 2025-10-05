@@ -1,37 +1,23 @@
 """
-Ollama integration service for AI operations
+Ollama integration service for AI operations using the official Ollama Python library
 """
 
-import httpx
-import json
+import asyncio
 from typing import List, Optional, Dict, Any
 from loguru import logger
+import ollama
+from ollama import AsyncClient, ResponseError
 
 from pkm_backend.core.config import settings
 
 
 class OllamaService:
-    """Service for interacting with Ollama LLM API"""
+    """Service for interacting with Ollama using the official Python library"""
     
     def __init__(self):
-        self.base_url = settings.OLLAMA_BASE_URL
+        self.host = settings.OLLAMA_BASE_URL
         self.default_model = settings.DEFAULT_LLM_MODEL
-    
-    async def _make_request(self, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Make HTTP request to Ollama API"""
-        url = f"{self.base_url}/{endpoint}"
-        
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            try:
-                response = await client.post(url, json=data)
-                response.raise_for_status()
-                return response.json()
-            except httpx.RequestError as e:
-                logger.error(f"Request error to Ollama: {e}")
-                raise Exception(f"Failed to connect to Ollama: {e}")
-            except httpx.HTTPStatusError as e:
-                logger.error(f"HTTP error from Ollama: {e}")
-                raise Exception(f"Ollama API error: {e}")
+        self.client = AsyncClient(host=self.host)
     
     async def generate(
         self,
@@ -58,22 +44,23 @@ class OllamaService:
             "content": prompt
         })
         
-        data = {
-            "model": model,
-            "messages": messages,
-            "stream": False,
-            "options": {
-                "temperature": temperature
-            }
-        }
-        
-        response = await self._make_request("api/chat", data)
-        
-        # Extract content from chat response
-        if "message" in response and "content" in response["message"]:
-            return response["message"]["content"]
-        
-        return response.get("response", "")
+        try:
+            response = await self.client.chat(
+                model=model,
+                messages=messages,
+                options={
+                    "temperature": temperature
+                }
+            )
+            
+            return response['message']['content']
+            
+        except ResponseError as e:
+            logger.error(f"Ollama API error: {e.error}")
+            raise Exception(f"Ollama API error: {e.error}")
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            raise Exception(f"Failed to generate text: {e}")
     
     async def cleanup_text(self, text: str, cleanup_type: str = "full") -> str:
         """Clean up and improve text quality"""
@@ -86,83 +73,90 @@ class OllamaService:
         }
         
         system_prompt = system_prompts.get(cleanup_type, system_prompts["full"])
-        prompt = f"Please improve the following text:\n\n{text}"
         
-        return await self.generate(prompt, system_prompt=system_prompt, temperature=0.3)
+        return await self.generate(
+            prompt=text,
+            system_prompt=system_prompt,
+            temperature=0.3  # Lower temperature for more consistent cleanup
+        )
     
-    async def rephrase_text(self, text: str, style: str = "academic") -> str:
+    async def rephrase_text(
+        self, 
+        text: str, 
+        style: str = "professional",
+        temperature: float = 0.7
+    ) -> str:
         """Rephrase text in a specific style"""
         
         style_prompts = {
-            "academic": "Rephrase the following text in a formal, academic style suitable for research papers.",
-            "casual": "Rephrase the following text in a casual, conversational style.",
-            "formal": "Rephrase the following text in a formal, professional style.",
-            "creative": "Rephrase the following text in a creative, engaging style."
+            "academic": "You are an academic writing expert. Rephrase the following text in a formal, scholarly tone suitable for academic papers. Use precise terminology and maintain objectivity.",
+            "professional": "You are a business writing expert. Rephrase the following text in a professional, corporate tone suitable for workplace communication.",
+            "casual": "You are a communication expert. Rephrase the following text in a casual, friendly tone suitable for informal conversations.",
+            "creative": "You are a creative writing expert. Rephrase the following text in an engaging, creative style that captures attention while maintaining the core message.",
+            "formal": "You are a formal writing expert. Rephrase the following text in a formal, respectful tone suitable for official communications."
         }
         
-        system_prompt = style_prompts.get(style, style_prompts["academic"])
-        prompt = f"Please rephrase this text:\n\n{text}"
+        system_prompt = style_prompts.get(style, style_prompts["professional"])
         
-        return await self.generate(prompt, system_prompt=system_prompt, temperature=0.5)
+        return await self.generate(
+            prompt=text,
+            system_prompt=system_prompt,
+            temperature=temperature
+        )
     
-    async def search_notes(self, query: str, note_contents: List[str]) -> List[Dict[str, Any]]:
-        """Search through notes using semantic understanding"""
+    async def chat_with_context(
+        self,
+        message: str,
+        context: str = "",
+        temperature: float = 0.7
+    ) -> str:
+        """Chat with provided context"""
         
-        system_prompt = """You are a search expert. Given a query and a list of note contents, 
-        rank them by relevance to the query. Return a JSON array of objects with:
-        - index: the index of the note in the input list
-        - relevance_score: a float between 0 and 1
-        - snippet: a brief excerpt that matches the query
+        if context:
+            system_prompt = f"You are a helpful assistant. Use the following context to answer questions:\n\n{context}\n\nAnswer based on the provided context when relevant, but you can also use your general knowledge."
+        else:
+            system_prompt = "You are a helpful assistant. Provide clear, informative answers to questions."
         
-        Only include notes with relevance_score > 0.1"""
+        return await self.generate(
+            prompt=message,
+            system_prompt=system_prompt,
+            temperature=temperature
+        )
+    
+    async def semantic_search_query(self, query: str, temperature: float = 0.3) -> str:
+        """Generate semantic search variations of a query"""
         
-        notes_text = "\n\n".join([f"Note {i}: {content}" for i, content in enumerate(note_contents)])
-        prompt = f"Query: {query}\n\nNotes:\n{notes_text}"
+        system_prompt = """You are a search expert. Given a search query, generate 3-5 semantically similar variations that could help find related content. 
+        Return only the variations, one per line, without explanations or numbering."""
         
-        response = await self.generate(prompt, system_prompt=system_prompt, temperature=0.2)
+        return await self.generate(
+            prompt=f"Search query: {query}",
+            system_prompt=system_prompt,
+            temperature=temperature
+        )
+    
+    async def check_model_availability(self, model: Optional[str] = None) -> bool:
+        """Check if a model is available locally"""
+        model = model or self.default_model
         
         try:
-            return json.loads(response)
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse search results as JSON")
-            return []
+            models = await self.client.list()
+            available_models = [m['name'] for m in models['models']]
+            return model in available_models
+        except Exception as e:
+            logger.error(f"Error checking model availability: {e}")
+            return False
     
-    async def chat_with_notes(self, message: str, note_contents: List[str], conversation_history: Optional[List[str]] = None) -> str:
-        """Chat about notes with context"""
-        
-        system_prompt = """You are a helpful assistant that can answer questions about the user's notes. 
-        Use the provided note contents as context to answer questions accurately. 
-        If the answer isn't in the notes, say so clearly."""
-        
-        context = "\n\n".join([f"Note {i+1}: {content}" for i, content in enumerate(note_contents)])
-        
-        prompt = f"Context from notes:\n{context}\n\nQuestion: {message}"
-        
-        if conversation_history:
-            history = "\n".join(conversation_history[-5:])  # Last 5 messages
-            prompt = f"Previous conversation:\n{history}\n\n{prompt}"
-        
-        return await self.generate(prompt, system_prompt=system_prompt, temperature=0.6)
-    
-    async def list_models(self) -> List[str]:
-        """List available models in Ollama"""
+    async def pull_model(self, model: Optional[str] = None) -> bool:
+        """Pull a model if not available"""
+        model = model or self.default_model
         
         try:
-            response = await self._make_request("api/tags", {})
-            models = response.get("models", [])
-            return [model["name"] for model in models]
-        except Exception:
-            logger.warning("Failed to list Ollama models")
-            return [self.default_model]
-    
-    async def check_health(self) -> bool:
-        """Check if Ollama is running and accessible"""
-        
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(f"{self.base_url}/api/tags")
-                return response.status_code == 200
-        except Exception:
+            await self.client.pull(model)
+            logger.info(f"Successfully pulled model: {model}")
+            return True
+        except Exception as e:
+            logger.error(f"Error pulling model {model}: {e}")
             return False
 
 

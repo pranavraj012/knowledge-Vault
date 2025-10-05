@@ -69,7 +69,7 @@ uv run uvicorn pkm_backend.main:app --reload --host localhost --port 8000
 ```bash
 # Install Ollama from https://ollama.ai/
 # Pull a language model
-ollama pull llama3.1
+ollama pull llama3.2:1b
 
 # Test AI integration
 cd backend

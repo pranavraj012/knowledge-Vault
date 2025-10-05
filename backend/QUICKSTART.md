@@ -39,7 +39,7 @@ The server will run on http://localhost:8000
 ## Setting up Ollama (Optional for AI features)
 
 1. Install Ollama from https://ollama.ai/
-2. Pull a model: `ollama pull llama3.1`
+2. Pull a model: `ollama pull llama3.2:1b`
 3. Test: `uv run python -m pkm_backend.cli check-ollama`
 
 ## CLI Commands

@@ -60,7 +60,7 @@ def check_ollama():
                 console.print(table)
             else:
                 console.print("⚠️  No models found. You may need to pull a model:", style="yellow")
-                console.print("   ollama pull llama3.1")
+                console.print("   ollama pull llama3.2:1b")
                 
         except Exception as e:
             console.print(f"❌ Error listing models: {e}", style="red")

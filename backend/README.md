@@ -25,9 +25,9 @@ A privacy-focused, student-friendly personal knowledge management system backend
 ### Installing Ollama
 
 1. Download and install Ollama from [ollama.ai](https://ollama.ai/)
-2. Pull a model (recommended: llama3.1):
+2. Pull a model (recommended: llama3.2:1b):
    ```bash
-   ollama pull llama3.1
+   ollama pull llama3.2:1b
    ```
 3. Verify Ollama is running:
    ```bash
@@ -172,7 +172,7 @@ DATABASE_URL=sqlite:///./pkm.db
 
 # Ollama
 OLLAMA_BASE_URL=http://localhost:11434
-DEFAULT_LLM_MODEL=llama3.1
+DEFAULT_LLM_MODEL=llama3.2:1b
 
 # Storage
 NOTES_STORAGE_PATH=./data/notes

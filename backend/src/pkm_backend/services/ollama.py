@@ -17,7 +17,10 @@ class OllamaService:
     def __init__(self):
         self.host = settings.OLLAMA_BASE_URL
         self.default_model = settings.DEFAULT_LLM_MODEL
-        self.client = AsyncClient(host=self.host)
+    
+    def _get_client(self) -> AsyncClient:
+        """Create a new AsyncClient for each request to avoid event loop issues"""
+        return AsyncClient(host=self.host)
     
     async def generate(
         self,
@@ -45,7 +48,8 @@ class OllamaService:
         })
         
         try:
-            response = await self.client.chat(
+            client = self._get_client()
+            response = await client.chat(
                 model=model,
                 messages=messages,
                 options={
@@ -162,7 +166,8 @@ class OllamaService:
     async def list_models(self) -> List[str]:
         """List available models"""
         try:
-            models_response = await self.client.list()
+            client = self._get_client()
+            models_response = await client.list()
             return [model['name'] for model in models_response['models']]
         except Exception as e:
             logger.error(f"Error listing models: {e}")
@@ -172,7 +177,8 @@ class OllamaService:
         """Check if Ollama service is healthy"""
         try:
             # Try to list models as a health check
-            await self.client.list()
+            client = self._get_client()
+            await client.list()
             return True
         except Exception as e:
             logger.error(f"Health check failed: {e}")

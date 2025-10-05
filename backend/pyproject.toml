@@ -48,3 +48,12 @@ pkm-cli = "pkm_backend.cli:app"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "rich>=14.1.0",
+    "typer>=0.19.2",
+]

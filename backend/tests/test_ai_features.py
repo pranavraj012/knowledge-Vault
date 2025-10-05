@@ -195,7 +195,7 @@ class TestAICleanup:
         """Test AI cleanup of a note"""
         request_data = {
             "note_id": ai_test_note.id,
-            "instructions": "Fix grammar and make it more professional"
+            "cleanup_type": "full"
         }
         
         start_time = time.time()
@@ -218,7 +218,7 @@ class TestAICleanup:
         """Test AI cleanup with grammar focus"""
         request_data = {
             "note_id": ai_test_note.id,
-            "instructions": "Focus only on fixing grammar and spelling errors"
+            "cleanup_type": "grammar"
         }
         
         response = client.post("/api/v1/ai/cleanup", json=request_data)
@@ -233,7 +233,7 @@ class TestAICleanup:
         """Test AI cleanup with non-existent note ID"""
         request_data = {
             "note_id": 99999,
-            "instructions": "Fix this note"
+            "cleanup_type": "full"
         }
         
         response = client.post("/api/v1/ai/cleanup", json=request_data)
@@ -313,10 +313,10 @@ class TestAIErrorHandling:
         # Mock the Ollama service to simulate server down
         from pkm_backend.services.ollama import ollama_service
         
-        async def mock_failing_request(*args, **kwargs):
+        async def mock_failing_generate(*args, **kwargs):
             raise Exception("Connection refused")
         
-        monkeypatch.setattr(ollama_service, "_make_request", mock_failing_request)
+        monkeypatch.setattr(ollama_service, "generate", mock_failing_generate)
         
         response = client.post("/api/v1/ai/rephrase", json={
             "text": "Test text",

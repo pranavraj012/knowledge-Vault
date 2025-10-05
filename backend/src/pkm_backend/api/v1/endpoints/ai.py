@@ -159,7 +159,8 @@ async def chat_with_notes(
             note_contents = [f"{note.title}\n\n{note.content}" for note in notes]
         
         # Use Ollama to generate response
-        response_text = await ollama_service.chat_with_notes(request.message, note_contents)
+        context = "\n\n".join(note_contents) if note_contents else ""
+        response_text = await ollama_service.chat_with_context(request.message, context)
         
         processing_time = int((time.time() - start_time) * 1000)
         

@@ -158,6 +158,25 @@ class OllamaService:
         except Exception as e:
             logger.error(f"Error pulling model {model}: {e}")
             return False
+    
+    async def list_models(self) -> List[str]:
+        """List available models"""
+        try:
+            models_response = await self.client.list()
+            return [model['name'] for model in models_response['models']]
+        except Exception as e:
+            logger.error(f"Error listing models: {e}")
+            return []
+    
+    async def check_health(self) -> bool:
+        """Check if Ollama service is healthy"""
+        try:
+            # Try to list models as a health check
+            await self.client.list()
+            return True
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return False
 
 
 # Global service instance

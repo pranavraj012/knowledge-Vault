@@ -62,7 +62,7 @@ class Settings(BaseSettings):
         description="Ollama API base URL"
     )
     DEFAULT_LLM_MODEL: str = Field(
-        default="llama3.1",
+        default="llama3.2:1b",
         description="Default LLM model for AI operations"
     )
     

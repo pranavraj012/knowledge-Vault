@@ -40,23 +40,39 @@ class OllamaService:
         system_prompt: Optional[str] = None,
         temperature: float = 0.7
     ) -> str:
-        """Generate text using Ollama"""
+        """Generate text using Ollama chat API"""
         
         model = model or self.default_model
         
+        # Prepare messages for chat format
+        messages = []
+        
+        if system_prompt:
+            messages.append({
+                "role": "system",
+                "content": system_prompt
+            })
+        
+        messages.append({
+            "role": "user", 
+            "content": prompt
+        })
+        
         data = {
             "model": model,
-            "prompt": prompt,
+            "messages": messages,
             "stream": False,
             "options": {
                 "temperature": temperature
             }
         }
         
-        if system_prompt:
-            data["system"] = system_prompt
+        response = await self._make_request("api/chat", data)
         
-        response = await self._make_request("api/generate", data)
+        # Extract content from chat response
+        if "message" in response and "content" in response["message"]:
+            return response["message"]["content"]
+        
         return response.get("response", "")
     
     async def cleanup_text(self, text: str, cleanup_type: str = "full") -> str:
